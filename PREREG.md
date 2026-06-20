@@ -95,3 +95,77 @@ If structured shows a CI-separated advantage over holistic on clean data (H1),
 proceed to Phase 2 scaling. If not, document the null and decide whether the
 question is still worth scaling. The decision is made on dev, then confirmed once
 on test.
+
+---
+
+## Phase 2 amendment (committed before the final test run)
+
+This section extends the pre-registration to cover the Phase 2 design.
+Written and committed before `--split test` is executed. Deviations will
+be reported explicitly.
+
+### Exact conditions in the final test run
+
+Models: llama3:latest (weak), gpt-4o-mini (mid), gpt-4o (frontier).
+Styles: holistic, structured.
+Levels: full, claims_only_untagged, output_only.
+Shots: 3. Split: test (n=120, 60 faithful / 60 omission, never touched).
+
+`claims_only_untagged` is the canonical claims-only condition: an enumerated
+list of claims with no safety labels, confirmed on dev to produce the same
+near-ceiling performance as the tagged version, ruling out label leakage.
+
+### Primary metric (unchanged)
+
+Balanced accuracy. Reported with 95% bootstrap CIs and Cohen's kappa.
+Paired bootstrap for all style comparisons on the same examples.
+
+### Pre-registered comparisons and predicted directions
+
+All predictions stated before the test run. CIs computed post-hoc.
+
+**C1. Structured vs holistic at full source (H1, primary).**
+Predicted direction: structured > holistic for mid and frontier models.
+For Llama3 8B: null predicted (calibration swap observed on dev — both
+styles converge at BA ~0.65 through opposite errors; no net advantage).
+Decision rule: CI excludes zero = supported. CI includes zero = null.
+Note: ~65% power at n=120 for the 0.125 dev effect. A null here is
+uninformative, not a failure.
+
+**C2. Output-only gap: structured vs holistic at output_only (headline).**
+Predicted direction: structured > holistic, expected large effect (~0.25).
+~95% power at n=120. This is the primary novel claim. A null here would
+be a genuine failure to replicate.
+Decision rule: CI excludes zero = supported.
+
+**C3. Per-style source-access degradation: full vs output_only.**
+Holistic: predicted specificity-dominant degradation (loses reference,
+over-flags). Predicted direction: full > output_only, large effect.
+Structured: predicted sensitivity-dominant degradation (loses ability to
+detect absence). Predicted direction: full > output_only, smaller effect
+than holistic. The asymmetry between styles is the novel mechanistic claim.
+
+**C4. Claims-only vs full.**
+Predicted: claims_only_untagged near-ceiling for mid and frontier models,
+confirming that enumerated reference access is the bottleneck. For Llama3
+8B: predicted claims_only_untagged < full (dev showed sensitivity collapse
+without the prose framing).
+
+**C5. Capability ladder (H2).**
+Predicted: structured advantage over holistic increases with capability.
+At Llama3 8B: null or reversed. At GPT-4o-mini: positive CI-separated.
+At GPT-4o: positive, at least as large as GPT-4o-mini.
+A monotone increasing advantage across the ladder confirms H2.
+
+### What gets reported regardless
+
+Every cell in the 3×2×3 grid gets reported, including any that fail to
+replicate dev findings. No cells are dropped, re-run, or re-prompted after
+seeing test numbers. The test run is executed once.
+
+### Power note
+
+The 0.250 output-only effect (C2) is powered at ~95% at n=120.
+The 0.125 full-source effect (C1) is powered at ~65% at n=120.
+A null on C1 at test is therefore consistent with a real effect and will
+be reported as such, not as a contradiction of dev findings.

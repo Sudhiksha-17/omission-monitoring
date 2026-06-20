@@ -213,6 +213,9 @@ def paired_bootstrap_comparison(
 def print_metrics(m: dict) -> None:
     """Pretty-print a compute_metrics result."""
     lbl = m.get("label", "")
+    if "error" in m or "balanced_accuracy" not in m:
+        print(f"\n  [{lbl}]  ERROR: {m.get('error','no parseable predictions')}")
+        return
     print(f"\n  [{lbl}]  BA={m['balanced_accuracy']:.4f}  "
           f"kappa={m['kappa']:.4f}  "
           f"parseable={m['n_parseable']}/{m['n_total']}")

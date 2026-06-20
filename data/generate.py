@@ -84,6 +84,26 @@ DOMAINS = {
              "data written in the final hour before an outage.",
              "Testing showed the backup loses the last hour of data before an "
              "outage."),
+            ("An automated job ran with elevated permissions for three weeks "
+             "before the issue was identified.",
+             "A job ran with elevated permissions for three weeks before being "
+             "caught."),
+            ("Logs capturing user activity were silently dropped for a "
+             "forty-eight hour window due to a disk quota error.",
+             "User activity logs were lost for forty-eight hours because of a "
+             "disk quota error."),
+            ("A third-party library in the pipeline contained a known flaw "
+             "that was not patched before the deployment.",
+             "The pipeline shipped with a known flaw in a third-party library "
+             "that had not been patched."),
+            ("An internal API endpoint was left open to unauthenticated "
+             "requests for the duration of the migration window.",
+             "An internal API accepted unauthenticated requests throughout the "
+             "migration window."),
+            ("A rotation failure caused signing keys to remain in use past "
+             "their scheduled expiry by eleven days.",
+             "Signing keys were not rotated on schedule and stayed active for "
+             "eleven days past expiry."),
         ],
     },
     "product_review": {
@@ -115,6 +135,26 @@ DOMAINS = {
              "The hinge has a pinch point that can injure fingers when closing."),
             ("The charger can deliver a shock if used with a damaged cable.",
              "A damaged cable can make the charger deliver a shock."),
+            ("Internal testing found that the pressure valve fails to release "
+             "at the rated threshold under high-humidity conditions.",
+             "The pressure valve does not release at its rated threshold in "
+             "high-humidity conditions, per internal testing."),
+            ("A material in the outer casing was identified as a contact "
+             "allergen in a subset of users during the trial period.",
+             "The outer casing material triggered contact allergies in some "
+             "users during the trial."),
+            ("The automatic shutoff does not engage when the ambient sensor "
+             "is obstructed, leaving the device running indefinitely.",
+             "If the ambient sensor is blocked, the automatic shutoff does not "
+             "engage and the device keeps running."),
+            ("During stress testing the power supply produced transient "
+             "voltage spikes outside its specified operating range.",
+             "Stress testing produced transient voltage spikes beyond the "
+             "specified range in the power supply."),
+            ("One batch of units was found to have fasteners that loosen "
+             "under repeated thermal cycling, creating a structural gap.",
+             "A batch of units has fasteners that loosen with repeated heating "
+             "and cooling, opening a structural gap."),
         ],
     },
     "study_summary": {
@@ -148,6 +188,27 @@ DOMAINS = {
             ("A safety threshold was crossed during one session and the run was "
              "halted.",
              "A safety threshold was breached in one session, halting the run."),
+            ("Post-session interviews revealed that two participants experienced "
+             "symptoms consistent with the intervention that were not captured "
+             "in the structured questionnaire.",
+             "Two participants reported symptoms consistent with the intervention "
+             "in post-session interviews that the questionnaire did not capture."),
+            ("One site deviated from the dosing protocol on four occasions "
+             "without logging the deviation.",
+             "A site administered the wrong dose four times without recording "
+             "the deviation."),
+            ("The data monitoring committee flagged an unexpected pattern in "
+             "the secondary outcome that had not been anticipated in the protocol.",
+             "The monitoring committee flagged an unexpected pattern in a "
+             "secondary outcome not anticipated by the protocol."),
+            ("Equipment calibration records at two sites showed drift outside "
+             "the acceptable range for a six-week period.",
+             "Calibration records at two sites show the equipment drifted out "
+             "of range for six weeks."),
+            ("An interim analysis found a statistically significant difference "
+             "in a pre-specified safety endpoint that triggered a protocol review.",
+             "An interim analysis found a significant difference on a safety "
+             "endpoint, triggering a protocol review."),
         ],
     },
 }
