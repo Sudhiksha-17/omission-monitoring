@@ -245,20 +245,18 @@ def dissociation_test(
     n_boot: int = 2000,
     seed: int = 42,
 ) -> dict:
-    """Test the error-profile dissociation hypothesis at a given source level.
+    """Test whether structured and holistic fail in opposite directions.
 
-    The dissociation is supported only if BOTH of the following hold:
-      1. Specificity: structured > holistic, CI excludes zero
-         (structured avoids false alarms on benign omissions; holistic over-flags)
-      2. Sensitivity: holistic >= structured, CI does not strongly favor structured
-         (holistic still catches real omissions; structured misses them)
+    A TRUE dissociation requires BOTH:
+      1. Structured significantly higher on specificity (CI excludes zero)
+      2. Holistic significantly higher on sensitivity (CI excludes zero)
 
-    BA alone cannot detect this: two monitors with opposite error profiles
-    can have identical BA, so a BA test can return null precisely when the
-    dissociation is strongest.
+    "Sensitivity null" is NOT a dissociation. It means structured dominates
+    on specificity with no measurable cost to sensitivity — a different and
+    weaker claim. Report it as "structured buys specificity at no cost to
+    sensitivity," not as a dissociation.
 
-    This is an exploratory test (not the pre-registered primary comparison).
-    Report CIs; do not headline the p_value.
+    This is an exploratory test. Report CIs; do not headline the p_value.
     """
     ba   = paired_bootstrap_comparison(structured_results, holistic_results,
                                         "ba",          n_boot=n_boot, seed=seed)
@@ -267,25 +265,37 @@ def dissociation_test(
     spec = paired_bootstrap_comparison(structured_results, holistic_results,
                                         "specificity", n_boot=n_boot, seed=seed)
 
-    # Dissociation is confirmed if specificity favors structured AND
-    # sensitivity does not strongly favor structured (holistic still catches omissions)
+    # True dissociation: structured wins specificity AND holistic wins sensitivity
     spec_favors_structured = spec.get("ci_lo", 0) > 0
-    sens_favors_holistic   = (sens.get("ci_hi", 0) >= -0.05)  # structured not better by >0.05
+    sens_favors_holistic   = sens.get("ci_hi", 0) < 0
+    sens_favors_structured = sens.get("ci_lo", 0) > 0
 
     if spec_favors_structured and sens_favors_holistic:
         dissociation_verdict = (
-            "DISSOCIATION CONFIRMED: structured has higher specificity (fewer false alarms), "
-            "holistic has comparable or higher sensitivity (catches more omissions). "
-            "The two styles fail in opposite directions."
+            "TRUE DISSOCIATION: structured significantly higher specificity, "
+            "holistic significantly higher sensitivity. "
+            "Both CI-separated in opposite directions."
         )
-    elif spec_favors_structured:
+    elif spec_favors_structured and sens_favors_structured:
         dissociation_verdict = (
-            "PARTIAL: structured specificity advantage is real, but structured also "
-            "dominates sensitivity — dissociation not clean."
+            "STRUCTURED STRICTLY DOMINATES: structured significantly higher on "
+            "both specificity and sensitivity. Holistic inverts at this condition — "
+            "it is not simply less specific, it is worse on every metric."
+        )
+    elif spec_favors_structured and not sens_favors_holistic:
+        dissociation_verdict = (
+            "STRUCTURED DOMINATES SPECIFICITY: structured has significantly higher "
+            "specificity with no measurable cost to sensitivity (sensitivity null). "
+            "This is NOT a dissociation — structured is simply better calibrated. "
+            "Claim: structured buys specificity at no cost to sensitivity."
+        )
+    elif not spec_favors_structured and not sens_favors_holistic:
+        dissociation_verdict = (
+            "NULL: neither specificity nor sensitivity difference is CI-separated."
         )
     else:
         dissociation_verdict = (
-            "NOT CONFIRMED: specificity difference is not CI-separated."
+            "PARTIAL or REVERSED: check individual CIs."
         )
 
     print(f"\n  {'─'*60}")
