@@ -38,12 +38,31 @@ from metrics import compute_metrics
 def load_results(results_dir: Path, split: str) -> list[dict]:
     """Load all per-condition result files for a given split."""
     all_res = []
-    for f in sorted(results_dir.glob(f"{split}_*.json")):
-        if "baseline" in f.name or "paired" in f.name or "H1" in f.name:
+    # Catch both properly-named files and legacy files without split prefix
+    candidates = sorted(set(
+        list(results_dir.glob("*.json")) +
+        list(results_dir.glob(f"{split}_*.json"))
+    ))
+    for f in candidates:
+        if any(x in f.name for x in ("baseline", "paired", "H1", "dissociation")):
             continue
-        data = json.loads(f.read_text())
-        if "results" in data and "metrics" in data:
-            all_res.append(data)
+        try:
+            data = json.loads(f.read_text())
+        except Exception:
+            continue
+        if "results" not in data or "metrics" not in data:
+            continue
+        results_list = data.get("results", [])
+        if not results_list:
+            continue
+        # Check this file belongs to the requested split
+        if results_list[0].get("split") != split:
+            continue
+        cond = infer_condition(f.name, data)
+        if not cond or cond.get("style") not in ("holistic", "structured"):
+            continue
+        data["_condition"] = cond
+        all_res.append(data)
     return all_res
 
 
@@ -63,14 +82,24 @@ def calibration_row(results: list[dict], m: dict) -> dict:
     }
 
 
-def infer_condition(filename: str) -> dict:
-    """Parse model, style, level from a result filename."""
+def infer_condition(filename: str, data: dict) -> dict:
+    """Parse model, style, level from result file — reads from JSON content first."""
+    # Primary: read from the results list (every record has style, source_level, model)
+    results = data.get("results", [])
+    if results:
+        r = results[0]
+        model = r.get("model", "")
+        style = r.get("style", "")
+        level = r.get("source_level", "")
+        if model and style and level:
+            # normalize level display name
+            if level == "claims_only_untagged":
+                level = "claims_only*"
+            return {"style": style, "level": level, "model": model}
+
+    # Fallback: parse from filename
     # filename format: {split}_{style}_{level}_{model}_{ts}.json
     parts = filename.replace(".json", "").split("_")
-    # parts[0] = split
-    # parts[1] = style (holistic|structured)
-    # parts[2] = level (full|claims|output)
-    # parts[3..] = model + timestamp
     if len(parts) < 4:
         return {}
     style = parts[1] if parts[1] in ("holistic", "structured") else "unknown"
@@ -78,13 +107,12 @@ def infer_condition(filename: str) -> dict:
     if level_raw == "full":
         level = "full"
     elif level_raw == "claims":
-        level = "claims_only"
+        level = "claims_only*"
     elif level_raw == "output":
         level = "output_only"
     else:
         level = level_raw
-    # model is everything between level and the timestamp (last token)
-    model_parts = parts[3:-1]   # drop timestamp
+    model_parts = parts[3:-1]
     model = "_".join(model_parts).replace("_latest", ":latest").replace("gpt_", "gpt-")
     return {"style": style, "level": level, "model": model}
 
@@ -167,32 +195,25 @@ def main():
         print("Run eval/run.py first.")
         return
 
+    # Deduplicate: if multiple files for same model/style/level, keep most recent
+    from collections import defaultdict
+    by_condition: dict[tuple, list] = defaultdict(list)
+    for data in all_data:
+        c = data.get("_condition", {})
+        key = (c.get("model",""), c.get("style",""), c.get("level",""))
+        by_condition[key].append(data)
+    all_data = []
+    for key, dlist in by_condition.items():
+        # sort by timestamp in metrics label or filename, keep last
+        dlist.sort(key=lambda d: d.get("metrics", {}).get("label", ""), reverse=True)
+        all_data.append(dlist[0])
+
     rows = []
     for data in all_data:
-        label = data.get("metrics", {}).get("label", "")
-        split_tag = args.split
-        style, level, model = "?", "?", "?"
-        for sty in ("holistic", "structured"):
-            for lvl in ("claims_only_untagged", "claims_only", "output_only", "full"):
-                prefix = f"{split_tag}_{sty}_{lvl}_"
-                if label.startswith(prefix):
-                    style = sty
-                    level = lvl
-                    rest  = label[len(prefix):]
-                    model_parts = rest.split("_")[:-2]
-                    raw_model = "_".join(model_parts)
-                    model = (raw_model
-                             .replace("llama3_latest", "llama3:latest")
-                             .replace("gpt_4o_mini",   "gpt-4o-mini")
-                             .replace("gpt_4o",        "gpt-4o")
-                             .replace("gpt_4",         "gpt-4"))
-                    # normalize display name
-                    if level == "claims_only_untagged":
-                        level = "claims_only*"
-                    break
-            if style != "?":
-                break
-
+        cond = data.get("_condition", {})
+        model = cond.get("model", "?")
+        style = cond.get("style", "?")
+        level = cond.get("level", "?")
         m   = data["metrics"]
         row = calibration_row(data["results"], m)
         row.update({"model": model, "style": style, "level": level})

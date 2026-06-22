@@ -46,14 +46,21 @@ def compute_metrics(results: list[dict], label: str = "") -> dict:
     Compute balanced accuracy, kappa, per-class report, and confusion matrix
     from a list of result dicts (each with true_label and pred_label).
     Unparseable outputs are dropped with a warning.
+    API errors (rate limits, transient failures) are reported separately.
     """
     kept, n_dropped = _filter_parseable(results)
     n_total = len(results)
     unparseable_rate = n_dropped / max(n_total, 1)
 
-    if n_dropped > 0:
-        print(f"  WARNING [{label}]: {n_dropped}/{n_total} unparseable outputs dropped "
-              f"({100*unparseable_rate:.1f}%)")
+    # Separate api_errors from genuine unparseable model output
+    n_api_errors = sum(1 for r in results if r.get("api_error") and r["pred_label"] is None)
+    n_genuine_unp = n_dropped - n_api_errors
+
+    if n_api_errors > 0:
+        print(f"  WARNING [{label}]: {n_api_errors}/{n_total} API errors (rate limit/transient) — "
+              f"rerun these records before trusting results.")
+    if n_genuine_unp > 0:
+        print(f"  WARNING [{label}]: {n_genuine_unp}/{n_total} genuine unparseable model outputs dropped.")
     if unparseable_rate > UNPARSEABLE_WARN_THRESHOLD:
         print(f"  *** UNRELIABLE: unparseable rate {100*unparseable_rate:.1f}% > "
               f"{100*UNPARSEABLE_WARN_THRESHOLD:.0f}%. Metrics may not reflect true "
@@ -124,31 +131,57 @@ def bootstrap_ci(results: list[dict], n_boot: int = 2000,
     }
 
 
+def _score_metric(y_true: np.ndarray, y_pred: np.ndarray, metric: str) -> float:
+    """Compute a single scalar metric given true and predicted labels.
+
+    metric: "ba" | "sensitivity" | "specificity"
+      ba          — balanced accuracy (mean of sensitivity and specificity)
+      sensitivity — recall of label 1 (omission recall; did we catch real omissions?)
+      specificity — recall of label 0 (faithful recall; did we avoid false alarms?)
+    """
+    if metric == "ba":
+        return balanced_accuracy_score(y_true, y_pred)
+    pos_mask = (y_true == 1)
+    neg_mask = (y_true == 0)
+    if metric == "sensitivity":
+        if pos_mask.sum() == 0:
+            return float("nan")
+        return float((y_pred[pos_mask] == 1).mean())
+    if metric == "specificity":
+        if neg_mask.sum() == 0:
+            return float("nan")
+        return float((y_pred[neg_mask] == 0).mean())
+    raise ValueError(f"unknown metric {metric!r}")
+
+
 def paired_bootstrap_comparison(
     structured_results: list[dict],
     holistic_results: list[dict],
+    metric: str = "ba",
     n_boot: int = 2000,
     alpha: float = 0.05,
     seed: int = 42,
+    silent: bool = False,
 ) -> dict:
-    """
-    The pre-registered primary comparison (PREREG.md / Section 6.5).
+    """Paired bootstrap CI on (structured - holistic) for a given metric.
 
-    Both result lists must cover THE SAME records (same ids in the same order).
-    We resample EXAMPLE INDICES and recompute (BA_structured - BA_holistic) on
-    each resample. The advantage is real only if the 95% CI excludes zero.
+    metric: "ba" | "sensitivity" | "specificity"
 
-    Returns:
-      observed_diff, ci_lo, ci_hi, p_value (fraction of resamples where diff <= 0),
-      and a plain-English verdict.
+    Both result lists must cover the same records (aligned by id).
+    Resamples example indices and recomputes the metric difference on each
+    resample. The difference is real only if the 95% CI excludes zero.
+
+    NOTE on multiplicity: this function is called for three metrics ×
+    multiple levels. Name the single pre-registered primary comparison
+    (BA at full source) and label all others exploratory, or apply a
+    correction. The CI is the verdict; the p_value is auxiliary.
     """
-    # Align on shared parseable ids
     s_by_id = {r["id"]: r for r in structured_results if r["pred_label"] is not None}
     h_by_id = {r["id"]: r for r in holistic_results   if r["pred_label"] is not None}
     shared_ids = sorted(set(s_by_id) & set(h_by_id))
 
     if len(shared_ids) < 5:
-        return {"error": f"only {len(shared_ids)} shared parseable records; too few to compare"}
+        return {"error": f"only {len(shared_ids)} shared parseable records; too few"}
 
     s_kept = [s_by_id[i] for i in shared_ids]
     h_kept = [h_by_id[i] for i in shared_ids]
@@ -157,8 +190,8 @@ def paired_bootstrap_comparison(
     ys_pred = np.array([r["pred_label"] for r in s_kept])
     yh_pred = np.array([r["pred_label"] for r in h_kept])
 
-    obs_s  = balanced_accuracy_score(ys_true, ys_pred)
-    obs_h  = balanced_accuracy_score(ys_true, yh_pred)
+    obs_s    = _score_metric(ys_true, ys_pred, metric)
+    obs_h    = _score_metric(ys_true, yh_pred, metric)
     obs_diff = obs_s - obs_h
 
     np.random.seed(seed)
@@ -169,44 +202,103 @@ def paired_bootstrap_comparison(
         yt = ys_true[idx]
         if len(np.unique(yt)) < 2:
             continue
-        ba_s = balanced_accuracy_score(yt, ys_pred[idx])
-        ba_h = balanced_accuracy_score(yt, yh_pred[idx])
-        diffs.append(ba_s - ba_h)
+        diffs.append(
+            _score_metric(yt, ys_pred[idx], metric) -
+            _score_metric(yt, yh_pred[idx], metric)
+        )
 
     diffs = np.array(diffs)
-    lo = float(np.percentile(diffs, 100 * alpha / 2))
-    hi = float(np.percentile(diffs, 100 * (1 - alpha / 2)))
-    p_val = float(np.mean(diffs <= 0))   # one-sided: P(structured <= holistic)
+    lo    = float(np.percentile(diffs, 100 * alpha / 2))
+    hi    = float(np.percentile(diffs, 100 * (1 - alpha / 2)))
+    p_val = float(np.mean(diffs <= 0))
 
     if lo > 0:
-        verdict = "STRUCTURED > HOLISTIC (CI excludes zero; H1 supported)"
+        verdict = f"STRUCTURED > HOLISTIC on {metric} (CI excludes zero)"
     elif hi < 0:
-        verdict = "HOLISTIC > STRUCTURED (CI excludes zero; H1 refuted)"
+        verdict = f"HOLISTIC > STRUCTURED on {metric} (CI excludes zero)"
     else:
-        verdict = "NO SIGNIFICANT DIFFERENCE (CI includes zero; H1 null)"
+        verdict = f"null on {metric} (CI includes zero)"
 
-    print("\n" + "=" * 60)
-    print("PAIRED BOOTSTRAP: structured vs holistic (pre-registered comparison)")
-    print("=" * 60)
-    print(f"  n shared parseable records: {len(shared_ids)}")
-    print(f"  Observed BA structured:     {obs_s:.4f}")
-    print(f"  Observed BA holistic:       {obs_h:.4f}")
-    print(f"  Observed difference:        {obs_diff:+.4f}")
-    print(f"  95% CI of difference:       [{lo:+.4f}, {hi:+.4f}]")
-    print(f"  P(structured <= holistic):  {p_val:.4f}")
-    print(f"  Verdict: {verdict}")
-    print("=" * 60)
+    if not silent:
+        print(f"\n  Paired bootstrap [{metric}]: "
+              f"S={obs_s:.3f} H={obs_h:.3f} diff={obs_diff:+.3f} "
+              f"CI=[{lo:+.3f},{hi:+.3f}]  {verdict}")
 
     return {
+        "metric": metric,
         "n_shared": len(shared_ids),
-        "ba_structured": round(obs_s, 4),
-        "ba_holistic": round(obs_h, 4),
+        "structured": round(obs_s, 4),
+        "holistic": round(obs_h, 4),
         "observed_diff": round(obs_diff, 4),
         "ci_lo": round(lo, 4),
         "ci_hi": round(hi, 4),
         "p_value": round(p_val, 4),
         "n_boot": len(diffs),
         "verdict": verdict,
+    }
+
+
+def dissociation_test(
+    structured_results: list[dict],
+    holistic_results: list[dict],
+    level: str,
+    n_boot: int = 2000,
+    seed: int = 42,
+) -> dict:
+    """Test the error-profile dissociation hypothesis at a given source level.
+
+    The dissociation is supported only if BOTH of the following hold:
+      1. Specificity: structured > holistic, CI excludes zero
+         (structured avoids false alarms on benign omissions; holistic over-flags)
+      2. Sensitivity: holistic >= structured, CI does not strongly favor structured
+         (holistic still catches real omissions; structured misses them)
+
+    BA alone cannot detect this: two monitors with opposite error profiles
+    can have identical BA, so a BA test can return null precisely when the
+    dissociation is strongest.
+
+    This is an exploratory test (not the pre-registered primary comparison).
+    Report CIs; do not headline the p_value.
+    """
+    ba   = paired_bootstrap_comparison(structured_results, holistic_results,
+                                        "ba",          n_boot=n_boot, seed=seed)
+    sens = paired_bootstrap_comparison(structured_results, holistic_results,
+                                        "sensitivity", n_boot=n_boot, seed=seed)
+    spec = paired_bootstrap_comparison(structured_results, holistic_results,
+                                        "specificity", n_boot=n_boot, seed=seed)
+
+    # Dissociation is confirmed if specificity favors structured AND
+    # sensitivity does not strongly favor structured (holistic still catches omissions)
+    spec_favors_structured = spec.get("ci_lo", 0) > 0
+    sens_favors_holistic   = (sens.get("ci_hi", 0) >= -0.05)  # structured not better by >0.05
+
+    if spec_favors_structured and sens_favors_holistic:
+        dissociation_verdict = (
+            "DISSOCIATION CONFIRMED: structured has higher specificity (fewer false alarms), "
+            "holistic has comparable or higher sensitivity (catches more omissions). "
+            "The two styles fail in opposite directions."
+        )
+    elif spec_favors_structured:
+        dissociation_verdict = (
+            "PARTIAL: structured specificity advantage is real, but structured also "
+            "dominates sensitivity — dissociation not clean."
+        )
+    else:
+        dissociation_verdict = (
+            "NOT CONFIRMED: specificity difference is not CI-separated."
+        )
+
+    print(f"\n  {'─'*60}")
+    print(f"  DISSOCIATION TEST at {level}:")
+    print(f"  {dissociation_verdict}")
+    print(f"  {'─'*60}")
+
+    return {
+        "level": level,
+        "ba": ba,
+        "sensitivity": sens,
+        "specificity": spec,
+        "dissociation_verdict": dissociation_verdict,
     }
 
 

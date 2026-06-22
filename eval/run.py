@@ -44,7 +44,8 @@ from schema import load_jsonl, iter_split, example_pool
 import source_access as sa
 from baseline import run_baseline
 from metrics import (
-    compute_metrics, bootstrap_ci, paired_bootstrap_comparison, print_metrics
+    compute_metrics, bootstrap_ci, paired_bootstrap_comparison,
+    print_metrics, dissociation_test,
 )
 
 ALL_STYLES = list(sa.PROMPT_STYLES)
@@ -53,6 +54,11 @@ ALL_LEVELS = list(sa.SOURCE_LEVELS)
 
 def timestamp() -> str:
     return datetime.now().strftime("%Y%m%d_%H%M%S")
+
+
+def safe_model_name(model: str) -> str:
+    """Sanitize model name for use in filenames — remove path separators."""
+    return model.replace(":", "_").replace("-", "_").replace("/", "_")
 
 
 def save(data: dict, path: Path) -> None:
@@ -76,13 +82,20 @@ def run_condition(style: str, level: str, records: list, examples: list,
         return []
 
     results = []
+    n_api_errors = 0
     for i, rec in enumerate(records):
         result = sa.predict(rec, examples, model, style, level, n_shots)
         results.append(result)
         label_str = "OMISSION" if result["true_label"] == 1 else "FAITHFUL"
         match = "✓" if result["pred_label"] == result["true_label"] else "✗"
+        api_tag = " [API_ERROR]" if result.get("api_error") else ""
+        if result.get("api_error"):
+            n_api_errors += 1
         print(f"    {match} [{i+1:03d}/{n}] {rec.id[:38]:38s} "
-              f"true={label_str:8s} pred={result['pred_str']}")
+              f"true={label_str:8s} pred={result['pred_str']}{api_tag}")
+    if n_api_errors:
+        print(f"  WARNING: {n_api_errors}/{len(results)} API errors (rate limit or transient). "
+              f"These are logged as api_error=True and should be rerun.")
     return results
 
 
@@ -165,7 +178,7 @@ def main():
                     continue
 
                 tag = (f"{args.split}_{style}_{level}_"
-                       f"{model.replace(':','_').replace('-','_')}_{ts}")
+                       f"{safe_model_name(model)}_{ts}")
                 m  = compute_metrics(results, label=tag)
                 ci = bootstrap_ci(results, seed=args.seed)
                 print_metrics(m)
@@ -180,38 +193,60 @@ def main():
     # ── primary paired comparisons ────────────────────────────────────────────
     print("\n" + "=" * 60)
     print("STEP 3: Paired bootstrap comparisons")
+    print("NOTE: BA at full source is the pre-registered primary comparison.")
+    print("All sensitivity/specificity and source-level comparisons are exploratory.")
     print("=" * 60)
 
     for model in args.model:
         mr = all_results.get(model, {})
 
-        # H1: structured_full vs holistic_full (pre-registered)
-        s_full = mr.get("structured", {}).get("full", [])
-        h_full = mr.get("holistic",   {}).get("full", [])
-        if s_full and h_full:
-            print(f"\n  [{model}] H1: structured_full vs holistic_full")
-            comp = paired_bootstrap_comparison(s_full, h_full, seed=args.seed)
-            save(comp, results_dir /
-                 f"{args.split}_H1_paired_{model.replace(':','_').replace('-','_')}_{ts}.json")
+        s_full  = mr.get("structured", {}).get("full", [])
+        h_full  = mr.get("holistic",   {}).get("full", [])
+        s_claims = mr.get("structured", {}).get("claims_only_untagged", [])
+        h_claims = mr.get("holistic",   {}).get("claims_only_untagged", [])
+        s_out   = mr.get("structured", {}).get("output_only", [])
+        h_out   = mr.get("holistic",   {}).get("output_only", [])
 
-        # Source-access effect within holistic
-        for lvl_a, lvl_b in [("full", "claims_only"),
-                               ("full", "output_only"),
-                               ("claims_only", "output_only")]:
+        print(f"\n{'='*60}")
+        print(f"  MODEL: {model}")
+        print(f"{'='*60}")
+
+        # H1: pre-registered primary — BA at full source
+        if s_full and h_full:
+            print(f"\n  [PRIMARY — pre-registered] H1: structured vs holistic at full source")
+            comp = paired_bootstrap_comparison(
+                s_full, h_full, metric="ba", seed=args.seed)
+            save(comp, results_dir /
+                 f"{args.split}_H1_BA_paired_{safe_model_name(model)}_{ts}.json")
+
+        # Dissociation tests — exploratory
+        for level, s_res, h_res in [
+            ("full",                s_full,   h_full),
+            ("claims_only_untagged", s_claims, h_claims),
+            ("output_only",          s_out,    h_out),
+        ]:
+            if s_res and h_res:
+                print(f"\n  [EXPLORATORY] Dissociation test at {level}:")
+                dt = dissociation_test(s_res, h_res, level=level, seed=args.seed)
+                save(dt, results_dir /
+                     f"{args.split}_dissociation_{level}_{safe_model_name(model)}_{ts}.json")
+
+        # Source-access degradation — exploratory
+        print(f"\n  [EXPLORATORY] Source-access degradation (holistic):")
+        for lvl_a, lvl_b in [("full", "claims_only_untagged"),
+                               ("full", "output_only")]:
             ra = mr.get("holistic", {}).get(lvl_a, [])
             rb = mr.get("holistic", {}).get(lvl_b, [])
             if ra and rb:
-                print(f"\n  [{model}] holistic: {lvl_a} vs {lvl_b}")
-                paired_bootstrap_comparison(ra, rb, seed=args.seed)
+                paired_bootstrap_comparison(ra, rb, metric="ba", seed=args.seed)
 
-        # Source-access effect within structured
-        for lvl_a, lvl_b in [("full", "claims_only"),
+        print(f"\n  [EXPLORATORY] Source-access degradation (structured):")
+        for lvl_a, lvl_b in [("full", "claims_only_untagged"),
                                ("full", "output_only")]:
             ra = mr.get("structured", {}).get(lvl_a, [])
             rb = mr.get("structured", {}).get(lvl_b, [])
             if ra and rb:
-                print(f"\n  [{model}] structured: {lvl_a} vs {lvl_b}")
-                paired_bootstrap_comparison(ra, rb, seed=args.seed)
+                paired_bootstrap_comparison(ra, rb, metric="ba", seed=args.seed)
 
     # ── summary table ─────────────────────────────────────────────────────────
     print("\n" + "=" * 60)
