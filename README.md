@@ -18,7 +18,7 @@ Full claim set and tables: [RESULTS.md](RESULTS.md). Writeup: [post/failopen_pos
 
 ## The confound, and why this repo leads with it
 
-The first version of this benchmark was **93.5% solvable by a length-plus-sentiment classifier** — the task was a surface artifact, not semantic reasoning. The fix (reframing the negative class so both classes drop exactly one claim) brought that probe to **chance (55.8%)**. That before/after is the single most important artifact here; see `analysis/surface_feature_probe.py` and `PREREG.md`. The whole dataset, including the frozen test, was regenerated after the fix.
+The first version of this benchmark was **93.5% solvable by a length-plus-sentiment classifier** — the task was a surface artifact, not semantic reasoning. The fix (reframing the negative class so both classes drop exactly one claim) brought that probe to **near chance (55.8%, down from 93.5%, and the confound-alert gate clears)**. A length-and-sentiment classifier still sits modestly above the 50% majority baseline, so a small residual surface signal remains; it is negligible relative to the original confound. That before/after is the single most important artifact here; see `analysis/surface_feature_probe.py` and `PREREG.md`. The whole dataset, including the frozen test, was regenerated after the fix.
 
 ## Repository layout
 
@@ -36,16 +36,23 @@ The first version of this benchmark was **93.5% solvable by a length-plus-sentim
 │   ├── schema.py                    <- Record schema + loader
 │   ├── dataset.jsonl                <- generated pairs (train/dev/test tagged)
 │   └── splits.json                  <- pair-level split assignment
+├── monitors/
+│   ├── source_access.py             <- eval harness (prompts, providers, parser)
+│   ├── baseline.py                  <- non-LLM confound baseline
+│   ├── holistic.py                  <- holistic monitor prompt
+│   └── structured.py                <- structured monitor prompt
+├── eval/
+│   ├── run.py                       <- grid runner (entry point; --i_have_read_prereg gates test)
+│   └── metrics.py                   <- balanced accuracy, kappa, paired bootstrap
 ├── analysis/
 │   ├── surface_feature_probe.py     <- the 0.935 -> 0.5583 confound gate
-│   ├── source_access.py             <- eval harness (prompts, providers, parser)
-│   ├── metrics.py                   <- balanced accuracy, kappa, paired bootstrap
 │   ├── calibration.py               <- per-cell calibration table
 │   ├── dev_bootstrap_cis.py         <- dev-split CIs (claim locking)
 │   ├── test_h1_bootstrap.py         <- held-out CIs (confirmation)
 │   ├── inversion_check.py           <- below-chance cells are genuine, not parser bugs
 │   ├── robustness_run.py            <- prompt-paraphrase robustness driver (resumable)
 │   ├── robustness_bootstrap.py      <- CIs for the paraphrase check
+│   ├── robustness_dev.jsonl         <- paraphrase-robustness raw output
 │   └── scripts/                     <- helper/recovery scripts (check_*, resume_failed)
 └── results/
     └── *.json                       <- raw per-prediction outputs (one file per cell)
@@ -74,7 +81,7 @@ python analysis/test_h1_bootstrap.py
 python analysis/robustness_run.py && python analysis/robustness_bootstrap.py
 ```
 
-The committed `results/` lets steps in (4) run with no API spend, so the held-out CIs are reproducible offline.
+The committed `results/` lets the step (4) analysis run with no API spend, so the held-out CIs are reproducible offline.
 
 ## What this is and is not
 
