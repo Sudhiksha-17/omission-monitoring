@@ -1,0 +1,35 @@
+{
+  "train": {
+    "n": 360,
+    "by_condition": {
+      "faithful": 180,
+      "omission": 180
+    },
+    "by_domain": {
+      "synthetic": 360
+    },
+    "pos_rate": 0.5
+  },
+  "dev": {
+    "n": 120,
+    "by_condition": {
+      "faithful": 60,
+      "omission": 60
+    },
+    "by_domain": {
+      "synthetic": 120
+    },
+    "pos_rate": 0.5
+  },
+  "test": {
+    "n": 120,
+    "by_condition": {
+      "faithful": 60,
+      "omission": 60
+    },
+    "by_domain": {
+      "synthetic": 120
+    },
+    "pos_rate": 0.5
+  }
+}
