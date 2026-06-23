@@ -1,0 +1,40 @@
+{
+  "level": "output_only",
+  "ba": {
+    "metric": "ba",
+    "n_shared": 120,
+    "structured": 0.6167,
+    "holistic": 0.2667,
+    "observed_diff": 0.35,
+    "ci_lo": 0.2344,
+    "ci_hi": 0.4658,
+    "p_value": 0.0,
+    "n_boot": 2000,
+    "verdict": "STRUCTURED > HOLISTIC on ba (CI excludes zero)"
+  },
+  "sensitivity": {
+    "metric": "sensitivity",
+    "n_shared": 120,
+    "structured": 0.2833,
+    "holistic": 0.4667,
+    "observed_diff": -0.1833,
+    "ci_lo": -0.3969,
+    "ci_hi": 0.0185,
+    "p_value": 0.968,
+    "n_boot": 2000,
+    "verdict": "null on sensitivity (CI includes zero)"
+  },
+  "specificity": {
+    "metric": "specificity",
+    "n_shared": 120,
+    "structured": 0.95,
+    "holistic": 0.0667,
+    "observed_diff": 0.8833,
+    "ci_lo": 0.75,
+    "ci_hi": 0.9831,
+    "p_value": 0.0,
+    "n_boot": 2000,
+    "verdict": "STRUCTURED > HOLISTIC on specificity (CI excludes zero)"
+  },
+  "dissociation_verdict": "DISSOCIATION CONFIRMED: structured has higher specificity (fewer false alarms), holistic has comparable or higher sensitivity (catches more omissions). The two styles fail in opposite directions."
+}

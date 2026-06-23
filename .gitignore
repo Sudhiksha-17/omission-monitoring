@@ -1,7 +1,9 @@
-﻿.env
+﻿__pycache__/
+*.pyc
+.env
 *.key
-__pycache__/
-.ipynb_checkpoints/
 *.log
-results/
-analysis/robustness_dev.jsonl
+.ipynb_checkpoints/
+.DS_Store
+.venv/
+venv/

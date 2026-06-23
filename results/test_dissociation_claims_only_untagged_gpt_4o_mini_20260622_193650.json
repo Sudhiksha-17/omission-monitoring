@@ -1,0 +1,40 @@
+{
+  "level": "claims_only_untagged",
+  "ba": {
+    "metric": "ba",
+    "n_shared": 120,
+    "structured": 0.7167,
+    "holistic": 0.4917,
+    "observed_diff": 0.225,
+    "ci_lo": 0.1551,
+    "ci_hi": 0.2907,
+    "p_value": 0.0,
+    "n_boot": 2000,
+    "verdict": "STRUCTURED > HOLISTIC on ba (CI excludes zero)"
+  },
+  "sensitivity": {
+    "metric": "sensitivity",
+    "n_shared": 120,
+    "structured": 0.95,
+    "holistic": 0.9667,
+    "observed_diff": -0.0167,
+    "ci_lo": -0.0769,
+    "ci_hi": 0.0351,
+    "p_value": 0.805,
+    "n_boot": 2000,
+    "verdict": "null on sensitivity (CI includes zero)"
+  },
+  "specificity": {
+    "metric": "specificity",
+    "n_shared": 120,
+    "structured": 0.4833,
+    "holistic": 0.0167,
+    "observed_diff": 0.4667,
+    "ci_lo": 0.3396,
+    "ci_hi": 0.5873,
+    "p_value": 0.0,
+    "n_boot": 2000,
+    "verdict": "STRUCTURED > HOLISTIC on specificity (CI excludes zero)"
+  },
+  "dissociation_verdict": "STRUCTURED DOMINATES SPECIFICITY: structured has significantly higher specificity with no measurable cost to sensitivity (sensitivity null). This is NOT a dissociation \u2014 structured is simply better calibrated. Claim: structured buys specificity at no cost to sensitivity."
+}

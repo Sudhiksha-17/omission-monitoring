@@ -1,0 +1,12 @@
+{
+  "metric": "ba",
+  "n_shared": 120,
+  "structured": 0.6417,
+  "holistic": 0.5,
+  "observed_diff": 0.1417,
+  "ci_lo": 0.0728,
+  "ci_hi": 0.2075,
+  "p_value": 0.0,
+  "n_boot": 2000,
+  "verdict": "STRUCTURED > HOLISTIC on ba (CI excludes zero)"
+}
