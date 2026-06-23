@@ -65,8 +65,8 @@ python data/generate.py
 python analysis/surface_feature_probe.py        # expect ~0.5583
 
 # 3. run the grid (writes incrementally to results/, resumable)
-python analysis/source_access.py --split dev
-python analysis/source_access.py --split test
+python eval/run.py --split dev --model gpt-4o-mini openai/gpt-oss-20b openai/gpt-oss-120b --shots 3
+python eval/run.py --split test --model gpt-4o-mini openai/gpt-oss-20b openai/gpt-oss-120b gpt-4o --i_have_read_prereg
 
 # 4. analysis (runs offline on the committed results/)
 python analysis/calibration.py --results results --split test
