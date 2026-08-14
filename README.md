@@ -18,7 +18,7 @@ Full claim set and tables: [RESULTS.md](RESULTS.md). Writeup: [post/failopen_pos
 
 ## The confound, and why this repo leads with it
 
-The first version of this benchmark was **93.5% solvable by a length-plus-sentiment classifier** — the task was a surface artifact, not semantic reasoning. The fix (reframing the negative class so both classes drop exactly one claim) brought that probe to **near chance (55.8%, down from 93.5%, and the confound-alert gate clears)**. A length-and-sentiment classifier still sits modestly above the 50% majority baseline, so a small residual surface signal remains; it is negligible relative to the original confound. That before/after is the single most important artifact here; see `analysis/surface_feature_probe.py` and `PREREG.md`. The whole dataset, including the frozen test, was regenerated after the fix.
+The first version of this benchmark was **93.5% solvable by a length-plus-sentiment classifier** — the task was a surface artifact, not semantic reasoning. The fix (reframing the negative class so both classes drop exactly one claim) brought that probe to **near chance (52.7%, down from 93.5%, and the confound-alert gate clears)**. A length-and-sentiment classifier still sits modestly above the 50% majority baseline, so a small residual surface signal remains; it is negligible relative to the original confound. That before/after is the single most important artifact here; see `analysis/surface_feature_probe.py` and `PREREG.md`. The whole dataset, including the frozen test, was regenerated after the fix.
 
 ## Repository layout
 
@@ -45,7 +45,7 @@ The first version of this benchmark was **93.5% solvable by a length-plus-sentim
 │   ├── run.py                       <- grid runner (entry point; --i_have_read_prereg gates test)
 │   └── metrics.py                   <- balanced accuracy, kappa, paired bootstrap
 ├── analysis/
-│   ├── surface_feature_probe.py     <- the 0.935 -> 0.5583 confound gate
+│   ├── surface_feature_probe.py     <- the 0.935 -> 0.527 confound gate
 │   ├── calibration.py               <- per-cell calibration table
 │   ├── dev_bootstrap_cis.py         <- dev-split CIs (claim locking)
 │   ├── test_h1_bootstrap.py         <- held-out CIs (confirmation)
@@ -69,7 +69,7 @@ export OPENROUTER_API_KEY=...    # gpt-oss-20b, gpt-oss-120b (SiliconFlow)
 python data/generate.py
 
 # 2. confound gate -- must be near chance before trusting anything downstream
-python analysis/surface_feature_probe.py        # expect ~0.5583
+python analysis/surface_feature_probe.py        # expect ~0.527
 
 # 3. run the grid (writes incrementally to results/, resumable)
 python eval/run.py --split dev --model gpt-4o-mini openai/gpt-oss-20b openai/gpt-oss-120b --shots 3
