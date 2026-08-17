@@ -22,7 +22,7 @@ That is the part I would want people building automated monitors to poke holes i
 
 ## What I actually measured
 
-The monitor sees a summary that omitted exactly one claim from its source. It decides: was the dropped claim the safety-relevant one, or a routine one? Both classes drop exactly one claim, so length and "something's missing" carry no signal — I verified a length-and-sentiment classifier sits near chance (0.5583, down from 0.935 in a naive first design that I had to throw out).
+The monitor sees a summary that omitted exactly one claim from its source. It decides: was the dropped claim the safety-relevant one, or a routine one? Both classes drop exactly one claim, so length and "something's missing" carry no signal — I verified a length-and-sentiment classifier sits near chance (0.527, down from 0.935 in a naive first design that I had to throw out).
 
 Two monitor prompts: **holistic** (one judgment) and **structured** (list the claims, mark each safety or routine, then decide). Three access levels: full source, claims-only, output-only.
 
