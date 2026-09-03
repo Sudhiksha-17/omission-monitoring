@@ -4,9 +4,9 @@ All claims confirmed on the frozen held-out test split (n=120 pairs/cell), CI-ba
 
 ## Confirmed (held-out, CI-clean)
 
-1. **Fail-open under source removal (headline).** Full to output_only degradation is sensitivity-dominant on 8 of 9 cells (sensitivity drops 0.42-0.82). The pre-registered specificity-dominant prediction is refuted. The lone exception is the gpt-4o anchor under holistic prompting, which fails toward false alarms instead.
+1. **Fail-open under source removal (headline).** Full to output_only degradation is sensitivity-dominant on 7 of 8 cells (sensitivity drops 0.42-0.82). The pre-registered specificity-dominant prediction is refuted. The lone exception is the gpt-4o anchor under holistic prompting, which fails toward false alarms instead.
 2. **Structured prompting protects every model at output_only**, on BA and specificity, all CI-clean.
-3. **Holistic goes below chance at output_only** on three models (kappa -0.27 to -0.42); structured stays positive. Direction claimed; mechanism (presence heuristic vs prior-defaulting vs misinterpretation) not adjudicable from one-word outputs.
+3. **Holistic goes below chance at output_only** on three models (kappa -0.25 to -0.42); structured stays positive. Direction claimed; mechanism (presence heuristic vs prior-defaulting vs misinterpretation) not adjudicable from one-word outputs.
 
 ## Scoped / secondary
 
@@ -89,7 +89,7 @@ BA = balanced accuracy. Sens = sensitivity (omission recall). Spec = specificity
 | gpt-oss-120b | holistic | -0.508 | -0.817 | -0.200 | sensitivity-dominant |
 | gpt-oss-120b | structured | -0.150 | -0.467 | +0.167 | sensitivity-dominant |
 
-Sensitivity-dominant degradation (the fail-open direction) on 8 of 9 cells. The sole exception is the gpt-4o anchor under holistic prompting, the only configuration that fails toward false alarms rather than false negatives.
+Sensitivity-dominant degradation (the fail-open direction) on 7 of 8 cells. The sole exception is the gpt-4o anchor under holistic prompting, the only configuration that fails toward false alarms rather than false negatives.
 
 ## Prompt-paraphrase robustness (dev split, full source)
 

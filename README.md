@@ -8,7 +8,7 @@ This README is the front door. It is structured to show the work: the confound t
 
 - **Task.** A summary omits exactly one claim from a multi-claim source. The monitor decides whether the omitted claim was the safety-relevant one or a routine one. Both classes drop one claim, so length and "something is missing" carry no signal.
 - **Manipulation.** Three source-access levels (full / claims-only / output-only) x two prompt styles (holistic / structured).
-- **Result 1 (headline, held-out, CI-clean).** Removing source access degrades **sensitivity**, not specificity — sensitivity-dominant on 8 of 9 cells. Monitors become permissive, not suspicious.
+- **Result 1 (headline, held-out, CI-clean).** Removing source access degrades **sensitivity**, not specificity — sensitivity-dominant on 7 of 8 cells. Monitors become permissive, not suspicious.
 - **Result 2 (held-out, CI-clean).** With no source, **structured prompting protects every model** on BA and specificity.
 - **Result 3 (direction, hedged).** Holistic monitoring goes **below chance** at output-only on three models; structured does not.
 - **Scoped secondary.** At full source, structure only *rescues a degenerate holistic baseline* (gpt-4o-mini); null on capable models. Not a general improvement.
