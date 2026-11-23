@@ -62,6 +62,7 @@ from __future__ import annotations
 
 import sys
 import os
+import re
 import time
 from pathlib import Path
 from typing import Literal
@@ -482,12 +483,14 @@ UNPARSEABLE = "UNPARSEABLE"
 def parse_prediction(response: str, style: PromptStyle) -> str:
     upper = response.strip().upper()
     if style == "structured":
-        # primary: DECISION: line
+        # primary: DECISION: line. Strip markdown emphasis first, since models
+        # often write "**DECISION:** **FAITHFUL** (the omission is routine)".
+        # The verdict is the first word after "DECISION:"; a keyword later in
+        # the explanation (e.g. "the omission is routine") must not override it.
         for line in upper.splitlines():
-            line = line.strip()
-            if line.startswith("DECISION:"):
-                if "OMISSION" in line: return "OMISSION"
-                if "FAITHFUL" in line: return "FAITHFUL"
+            line = re.sub(r"[*_`]", "", line).replace("\u202f", " ").strip()
+            m = re.match(r"DECISION\s*:\W*(OMISSION|FAITHFUL)\b", line)
+            if m: return m.group(1)
         # fallback: last occurrence wins
         last_om = upper.rfind("OMISSION")
         last_fa = upper.rfind("FAITHFUL")
